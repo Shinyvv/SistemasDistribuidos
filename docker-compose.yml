@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:4.4
+    container_name: mongo-waze
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-data:/data/db
+    networks:
+      - red-waze
+
+  redis-lru-10mb:
+    image: redis:6
+    container_name: redis-waze-lru-10mb
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory", "100mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - red-waze
+
+  redis-random-10mb:
+    image: redis:6
+    container_name: redis-waze-random-10mb
+    ports:
+      - "6380:6379"
+    command: ["redis-server", "--maxmemory", "100mb", "--maxmemory-policy", "allkeys-random"]
+    networks:
+      - red-waze
+
+  redis-lru-50mb:
+    image: redis:6
+    container_name: redis-waze-lru-50mb
+    ports:
+      - "6381:6379"
+    command: ["redis-server", "--maxmemory", "5mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - red-waze
+
+  redis-random-50mb:
+    image: redis:6
+    container_name: redis-waze-random-50mb
+    ports:
+      - "6382:6379"
+    command: ["redis-server", "--maxmemory", "5mb", "--maxmemory-policy", "allkeys-random"]
+    networks:
+      - red-waze
+
+  scraper:
+    build: ./scraper
+    container_name: scraper-waze
+    depends_on:
+      - mongodb
+    networks:
+      - red-waze
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DB=waze
+      - MONGO_COLLECTION=eventos
+
+  synthetic-generator-lru-10mb:
+    build: ./synthetic-generator
+    container_name: generator-waze-lru-10mb
+    depends_on:
+      - mongodb
+      - redis-lru-10mb
+    networks:
+      - red-waze
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - REDIS_HOST=redis-lru-10mb
+      - REDIS_PORT=6379
+      - POLITICA=LRU-10mb
+    command: ["python", "generator.py", "--modelo", "random", "--tasa", "5", "--cantidad", "10100"]
+
+  synthetic-generator-random-10mb:
+    build: ./synthetic-generator
+    container_name: generator-waze-random-10mb
+    depends_on:
+      - mongodb
+      - redis-random-10mb
+    networks:
+      - red-waze
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - REDIS_HOST=redis-random-10mb
+      - REDIS_PORT=6379
+      - POLITICA=RANDOM-10mb
+    command: ["python", "generator.py", "--modelo", "random", "--tasa", "5", "--cantidad", "10100"]
+
+  synthetic-generator-lru-50mb:
+    build: ./synthetic-generator
+    container_name: generator-waze-lru-50mb
+    depends_on:
+      - mongodb
+      - redis-lru-50mb
+    networks:
+      - red-waze
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - REDIS_HOST=redis-lru-50mb
+      - REDIS_PORT=6379
+      - POLITICA=LRU-50MB
+    command: ["python", "generator.py", "--modelo", "random", "--tasa", "5", "--cantidad", "10100"]
+
+  synthetic-generator-random-50mb:
+    build: ./synthetic-generator
+    container_name: generator-waze-random-50mb
+    depends_on:
+      - mongodb
+      - redis-random-50mb
+    networks:
+      - red-waze
+    environment:
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - REDIS_HOST=redis-random-50mb
+      - REDIS_PORT=6379
+      - POLITICA=RANDOM-50MB
+    command: ["python", "generator.py", "--modelo", "random", "--tasa", "5", "--cantidad", "10100"]
+
+networks:
+  red-waze:
