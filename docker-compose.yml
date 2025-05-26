@@ -139,6 +139,15 @@ services:
     volumes:
       - ./:/output
 
+  analyzer-pig:
+    build: ./analyzer-pig
+    container_name: pig-analyzer
+    volumes:
+      - ./eventos_limpios.csv:/scripts/eventos_limpios.csv
+      - ./analyzer-pig:/scripts
+    networks:
+      - red-waze
+
 
 networks:
   red-waze:
