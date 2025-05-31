@@ -118,7 +118,7 @@ def main():
                 print("Esperando\n", flush=True)
                 time.sleep(INTERVALO_ENTRE_CONSULTAS)
 
-            if len(eventos_live) < 10:
+            if nuevos_eventos < 10:
                 contador_zona = (contador_zona + 1) % len(ZONAS_RM)
                 print(" Cambiando zona\n", flush=True)
 
