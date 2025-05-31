@@ -1,15 +1,18 @@
 import os
-import json
 import time
-import requests
 from datetime import datetime
-from collections import defaultdict
 from pymongo import MongoClient, errors
+from playwright.sync_api import sync_playwright
 
-URL_WAZE = "https://www.waze.com/live-map/api/georss?top=-33.3&bottom=-33.7&left=-70.95&right=-70.35&env=row&types=alerts,traffic"
-INTERVALO_ENTRE_CONSULTAS = 100  
-PAUSA_EXTRA_EVENTOS = 100        
-EVENTOS_ANTES_DE_PAUSA = 100
+INTERVALO_ENTRE_CONSULTAS = 50  
+PAUSA_EXTRA_EVENTOS = 50        
+LIMITE_EVENTOS = 50
+
+ZONAS_RM = [
+    (-33.4489, -70.6693), (-33.4569, -70.6483), (-33.5019, -70.7594), (-33.4284, -70.5737),
+    (-33.3955, -70.7856), (-33.5866, -70.7055), (-33.3773, -70.6414), (-33.4189, -70.6075),
+    (-33.4811, -70.6126), (-33.4027, -70.5796)
+]
 
 COMUNAS_REGION_METROPOLITANA = {
     "Cerrillos", "Cerro Navia", "Conchalí", "El Bosque", "Estación Central", "Huechuraba",
@@ -25,50 +28,79 @@ COMUNAS_REGION_METROPOLITANA = {
 def conectar_mongo():
     mongo_host = os.getenv("MONGO_HOST", "localhost")
     mongo_port = int(os.getenv("MONGO_PORT", 27017))
-    mongo_db_nombre = os.getenv("MONGO_DB", "waze")
-    mongo_collection = os.getenv("MONGO_COLLECTION", "eventos")
-
     cliente_mongo = MongoClient(mongo_host, mongo_port)
-    base_datos = cliente_mongo[mongo_db_nombre]
-    coleccion_eventos = base_datos[mongo_collection]
+    base_datos = cliente_mongo["waze"]
+    coleccion_eventos = base_datos["eventos"]
     coleccion_eventos.create_index("uuid", unique=True)
     return coleccion_eventos
 
 def pertenece_a_rm(ciudad, nearby):
     return ciudad in COMUNAS_REGION_METROPOLITANA or nearby in COMUNAS_REGION_METROPOLITANA
 
+def extraer_eventos(lat, lon):
+    eventos = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        def interceptar_respuesta(response):
+            content_type = response.headers.get("content-type", "")
+            if "application/json" in content_type:
+                try:
+                    data = response.json()
+                    for key in ("alerts", "jams"):
+                        if key in data:
+                            eventos.extend(data[key])
+                except Exception:
+                    pass
+
+        page.on("response", interceptar_respuesta)
+        page.goto("https://www.waze.com/live-map")
+        page.wait_for_timeout(5000)
+
+        try:
+            page.evaluate(f"""() => {{
+                if (typeof W !== 'undefined' && W.map && typeof W.map.setCenter === 'function') {{
+                    W.map.setCenter({{lat: {lat}, lon: {lon}}});
+                    W.map.setZoom(11);
+                }}
+            }}""")
+        except:
+            pass
+
+        for _ in range(5):
+            page.keyboard.press('-')
+            page.wait_for_timeout(500)
+
+        page.wait_for_timeout(8000)
+        browser.close()
+
+    return eventos
+
 def main():
     coleccion = conectar_mongo()
     contador_nuevos_eventos = 0
+    contador_zona = 0
 
-    print(f"[{datetime.now()}] Scraper conectado", flush=True)
+    print(f"Scraper iniciado", flush=True)
 
     while True:
         try:
-            respuesta = requests.get(URL_WAZE)
-            respuesta.raise_for_status()
-            datos = respuesta.json()
+            lat, lon = ZONAS_RM[contador_zona]
+            eventos_live = extraer_eventos(lat, lon)
+            print(f"Eventos recibidos: {len(eventos_live)}", flush=True)
 
-            total_eventos = 0
             nuevos_eventos = 0
-            eventos_en_rm = 0
-            eventos_fuera_rm = 0
-            comunas_fuera_rm = defaultdict(int)
 
-            for evento in datos.get("alerts", []) + datos.get("jams", []):
-                total_eventos += 1
-                uuid_evento = evento.get("uuid")
-                ciudad_evento = evento.get("city", "SIN_CIUDAD")
-                nearby_evento = evento.get("nearBy", "SIN_NEARBY")
+            for evento in eventos_live:
+                uuid = evento.get("uuid")
+                ciudad = evento.get("city", "SIN_CIUDAD")
+                nearby = evento.get("nearBy", "SIN_NEARBY")
 
-                if pertenece_a_rm(ciudad_evento, nearby_evento):
-                    eventos_en_rm += 1
-                else:
-                    eventos_fuera_rm += 1
-                    comuna_fuera = nearby_evento if ciudad_evento == "SIN_CIUDAD" else ciudad_evento
-                    comunas_fuera_rm[comuna_fuera] += 1
+                if not uuid:
+                    continue
 
-                if uuid_evento:
+                if pertenece_a_rm(ciudad, nearby):
                     try:
                         coleccion.insert_one(evento)
                         nuevos_eventos += 1
@@ -76,23 +108,21 @@ def main():
                     except errors.DuplicateKeyError:
                         pass
 
-            porcentaje_en_rm = (eventos_en_rm / total_eventos * 100) if total_eventos > 0 else 0
-            porcentaje_fuera_rm = 100 - porcentaje_en_rm
+            print(f"Nuevos insertados: {nuevos_eventos} - total en Mongo: {coleccion.estimated_document_count()}", flush=True)
 
-            print("\nNuevo Ciclo", flush=True)
-            print(f"Nuevos eventos insertados en MongoDB: {nuevos_eventos}", flush=True)
-            print(f"Total acumulado de eventos en MongoDB: {coleccion.estimated_document_count()} eventos\n", flush=True)
-
-            if contador_nuevos_eventos >= EVENTOS_ANTES_DE_PAUSA:
-                print(f"Pausa Extra", flush=True)
+            if contador_nuevos_eventos >= LIMITE_EVENTOS:
+                print("PAUSA", flush=True)
                 time.sleep(PAUSA_EXTRA_EVENTOS)
                 contador_nuevos_eventos = 0
             else:
-                print(f"Esperando por si acaso\n", flush=True)
+                print("Esperando\n", flush=True)
                 time.sleep(INTERVALO_ENTRE_CONSULTAS)
 
-        except Exception as error:
-            print(f"ERROR\n")
+            if len(eventos_live) < 10:
+                contador_zona = (contador_zona + 1) % len(ZONAS_RM)
+                print(" Cambiando zona\n", flush=True)
+
+        except:
             time.sleep(3)
 
 if __name__ == "__main__":
