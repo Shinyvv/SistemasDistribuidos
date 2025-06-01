@@ -144,7 +144,6 @@ services:
     container_name: pig-analyzer
     volumes:
       - ./eventos_limpios.csv:/scripts/eventos_limpios.csv
-      - ./analyzer-pig:/scripts
     networks:
       - red-waze
 
