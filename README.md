@@ -9,6 +9,26 @@ db.eventos.count()      // Contar documentos
 db.eventos.find()       // Ver documentos
 
 CONFIGURACIONES
+
+
+-copiar la data a la base
+docker cp eventos1.json mongo-waze:/eventos1.json
+docker cp eventos2.json mongo-waze:/eventos2.json
+
+
+docker exec -it mongo-waze bash
+mongoimport --db waze --collection eventos --file /eventos1.json --jsonArray
+mongoimport --db waze --collection eventos --file /eventos2.json --jsonArray
+mongoimport --db waze --collection eventos --file /eventos2.json
+
+docker compose build
+docker compose up -d
+funciona!!!
+
+
+
+
+
 --------------
 Redis LRU 10MB:    puerto 6379
 Redis Random 10MB: puerto 6380

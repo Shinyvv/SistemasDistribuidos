@@ -3,8 +3,8 @@ import csv
 from datetime import datetime
 from pymongo.errors import ConnectionFailure
 import os
-os.makedirs("/output", exist_ok=True)
 
+os.makedirs("/output", exist_ok=True)
 
 MONGO_HOST = "mongodb"
 MONGO_PORT = 27017
@@ -15,22 +15,36 @@ CAMPOS_REQUERIDOS = ["uuid", "type", "location", "pubMillis", "roadType", "stree
 
 def normalizar_evento(evento):
     try:
+        pubMillis = evento.get("pubMillis", 0)
+        if not isinstance(pubMillis, (int, float)) or pubMillis <= 0:
+            return None
+        timestamp = datetime.fromtimestamp(pubMillis / 1000)
+        if timestamp.year < 2023 or timestamp.year > 2026:
+            return None
+
+        comuna = str(evento.get("city", "desconocida")).lower().strip().replace('"', '')
+        comuna = comuna.replace(',', ' ')
+
         return {
             "uuid": evento.get("uuid", ""),
-            "tipo": evento.get("type", "desconocido").lower().strip(),
-            "comuna": evento.get("city", "desconocida").lower().strip(),
-            "timestamp": datetime.fromtimestamp(evento.get("pubMillis", 0)/1000).isoformat(),
-            "timestamp_clave": int(evento.get("pubMillis", 0) / 1000 / 300),
+            "tipo": str(evento.get("type", "desconocido")).lower().strip().replace('"', ''),
+            "comuna": comuna,
+            "timestamp": timestamp.isoformat(),
+            "timestamp_clave": int(pubMillis / 1000 / 300),
             "lat": round(evento["location"]["y"], 3),
             "lon": round(evento["location"]["x"], 3),
-            "descripcion": evento.get("reportDescription", "").lower().strip()
+            "descripcion": str(evento.get("reportDescription", "")).lower().strip().replace('"', '')
         }
     except Exception:
         return None
 
 def conectar_mongo():
     try:
-        cliente = pymongo.MongoClient(host=MONGO_HOST, port=MONGO_PORT, serverSelectionTimeoutMS=5000)
+        cliente = pymongo.MongoClient(
+            host=MONGO_HOST,
+            port=MONGO_PORT,
+            serverSelectionTimeoutMS=5000
+        )
         cliente.server_info()
         return cliente[MONGO_DB][MONGO_COLLECTION]
     except ConnectionFailure:
