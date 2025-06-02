@@ -137,13 +137,14 @@ services:
       - MONGO_DB=waze
       - MONGO_COLLECTION=eventos
     volumes:
-      - ./:/output
+      - ./datos-salida:/output
+
 
   analyzer-pig:
     build: ./analyzer-pig
     container_name: pig-analyzer
     volumes:
-      - ./eventos_limpios.csv:/scripts/eventos_limpios.csv
+      - ./datos-salida:/output
     networks:
       - red-waze
 

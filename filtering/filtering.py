@@ -2,6 +2,9 @@ import pymongo
 import csv
 from datetime import datetime
 from pymongo.errors import ConnectionFailure
+import os
+os.makedirs("/output", exist_ok=True)
+
 
 MONGO_HOST = "mongodb"
 MONGO_PORT = 27017
