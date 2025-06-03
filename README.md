@@ -1,29 +1,63 @@
-MONGODB
--------
-# Conectarse a MongoDB
-mongo mongodb://localhost:27017
+## Nuevos componentes
 
-# Comandos útiles MongoDB
-use waze                // Seleccionar base de datos
-db.eventos.count()      // Contar documentos
-db.eventos.find()       // Ver documentos
+### 1. Módulo `filtering`
 
-CONFIGURACIONES
+- **Función principal:** Conectar a MongoDB, extraer eventos, limpiar y normalizar campos, filtrar duplicados y exportar un archivo CSV limpio (`eventos_limpios.csv`).
+- **Tecnologías:** Python, PyMongo.
+
+### 2. Módulo `analyzer-pig`
+
+- **Función principal:** Procesar el archivo CSV generado por el módulo `filtering`, generando estadísticas de:
+  - Eventos por tipo.
+  - Eventos por comuna.
+  - Eventos por hora.
+- **Tecnologías:** Apache Pig, Hadoop.
+
+### 3. Carpeta `datos-salida`
+
+- Contiene los archivos CSV resultantes del análisis.
+- También se incluyen los gráficos generados en LaTeX para el informe.
+
+## Instrucciones de uso.
+
+### Requisitos
+
+- Docker y Docker Compose instalados.
+
+### Ejecución
+
+1. **Clonar el repositorio:**
+   ```bash
+   git clone https://github.com/Shinyvv/SistemasDistribuidos.git
+   cd SistemasDistribuidos
 
 
--copiar la data a la base
+2. copiar la data a la base
 docker cp eventos1.json mongo-waze:/eventos1.json
 docker cp eventos2.json mongo-waze:/eventos2.json
-
-
 docker exec -it mongo-waze bash
 mongoimport --db waze --collection eventos --file /eventos1.json --jsonArray
-mongoimport --db waze --collection eventos --file /eventos2.json --jsonArray
 mongoimport --db waze --collection eventos --file /eventos2.json
 
+3. Arrancar contenedores
 docker compose build
 docker compose up -d
 funciona!!!
+
+## En caso de no funcionar o querer probar contenedores especificos.
+
+### Scraper
+docker compose build scraper
+docker compose run scraper
+
+### filtering
+docker compose build filtering
+docker compose run filtering
+
+### analyzer-pig
+docker compose build analyzer-pig
+docker compose run analyzer-pig
+-Luego de correr estos dos se pueden observar los resultados en datos-salida.
 
 
 
