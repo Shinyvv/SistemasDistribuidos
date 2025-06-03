@@ -31,15 +31,20 @@
    git clone https://github.com/Shinyvv/SistemasDistribuidos.git
    cd SistemasDistribuidos
 
+2. Arrancar contenedores
+docker compose build
+docker compose up -d
 
-2. copiar la data a la base
+3. copiar la data
 docker cp eventos1.json mongo-waze:/eventos1.json
 docker cp eventos2.json mongo-waze:/eventos2.json
+
+4. Entrar al bash
 docker exec -it mongo-waze bash
 mongoimport --db waze --collection eventos --file /eventos1.json --jsonArray
 mongoimport --db waze --collection eventos --file /eventos2.json
 
-3. Arrancar contenedores
+5. Volver a Arrancar contenedores
 docker compose build
 docker compose up -d
 funciona!!!
