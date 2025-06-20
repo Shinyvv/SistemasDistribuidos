@@ -148,6 +148,53 @@ services:
     networks:
       - red-waze
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.12
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - red-waze
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 10s
+      retries: 10
+      start_period: 20s
+      timeout: 5s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.12
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    networks:
+      - red-waze
+    depends_on:
+      - elasticsearch
+
+  elastic-loader:
+    build: ./elastic-loader
+    container_name: elastic-loader
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./datos-salida:/output
+    networks:
+      - red-waze
 
 networks:
   red-waze:
+  
+volumes:
+  esdata:

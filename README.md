@@ -64,8 +64,8 @@ docker compose build analyzer-pig
 docker compose run analyzer-pig
 -Luego de correr estos dos se pueden observar los resultados en datos-salida.
 
-
-
+## elastic
+http://localhost:5601/
 
 
 --------------
