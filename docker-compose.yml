@@ -193,6 +193,21 @@ services:
     networks:
       - red-waze
 
+  cache:
+    build: ./cache
+    container_name: cache
+    depends_on:
+      - elasticsearch
+      - redis-lru-10mb
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_HOST=redis-lru-10mb
+      - REDIS_PORT=6379
+      - ELASTIC_URL=http://elasticsearch:9200
+    networks:
+      - red-waze
+
 networks:
   red-waze:
   
