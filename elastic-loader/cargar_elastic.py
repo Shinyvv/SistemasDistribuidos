@@ -27,8 +27,10 @@ def indexar_archivo(path, index_name, headers, es):
         for row in reader:
             if len(row) != len(headers):
                 continue
-            doc = dict(zip(headers, row))
-            es.index(index=index_name, document=doc)
+            doc = {
+            headers[0]: row[0],
+            headers[1]: int(row[1])
+        }
 
 def indexar_eventos_crudos(path, es):
     if not os.path.exists(path):
