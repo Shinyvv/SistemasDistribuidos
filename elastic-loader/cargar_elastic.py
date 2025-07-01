@@ -31,6 +31,7 @@ def indexar_archivo(path, index_name, headers, es):
                 headers[0]: row[0],
                 headers[1]: int(row[1])
             }
+            es.index(index=index_name, document=doc)
 
 def indexar_eventos_crudos(path, es):
     if not os.path.exists(path):
